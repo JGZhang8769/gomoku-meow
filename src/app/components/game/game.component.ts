@@ -126,10 +126,14 @@ export class GameComponent implements OnInit, OnDestroy {
     this.whiteCooldown = 0;
     this.cameraRotation = 0;
     this.isInteractable = true;
+    this.localColor = 'black';
 
     if (this.mode === 'multi' && this.roomId) {
       // Reset logic handled by host if needed, simplified here
     }
+
+    // Force a tick so the board initializes with correct color
+    setTimeout(() => this.cdr.detectChanges(), 0);
   }
 
   async onCellClick(pos: {x: number, z: number}) {
