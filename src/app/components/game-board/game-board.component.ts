@@ -60,6 +60,9 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (changes['playerColor'] && changes['playerColor'].currentValue) {
       this.setInitialCameraAngle();
     }
+    if (changes['cameraRotationOffset']) {
+      this.applyCameraRotation();
+    }
     if (changes['eventAnimationData'] && changes['eventAnimationData'].currentValue) {
       this.playEventAnimation(changes['eventAnimationData'].currentValue);
     }
@@ -144,11 +147,15 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
 
   private setInitialCameraAngle() {
     // Determine base position based on color
+    let baseAngle = 0; // Default Black angle (position: 0, 15, 18)
     if (this.playerColor === 'white') {
-      this.camera.position.set(0, 15, -18);
-    } else {
-      this.camera.position.set(0, 15, 18);
+      baseAngle = Math.PI; // White angle (position: 0, 15, -18)
     }
+
+    const totalAngle = baseAngle + THREE.MathUtils.degToRad(this.cameraRotationOffset);
+    const radius = 18; // Derived from initial Z position
+
+    this.camera.position.set(radius * Math.sin(totalAngle), 15, radius * Math.cos(totalAngle));
     this.camera.lookAt(0, 0, 0);
     this.controls.update();
   }
@@ -227,7 +234,8 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private applyCameraRotation() {
-    // We handle rotation smoothly in playEventAnimation now, but keep this for absolute state sync if needed.
+    if (!this.camera) return;
+    this.setInitialCameraAngle();
   }
 
   private playEventAnimation(event: any) {
