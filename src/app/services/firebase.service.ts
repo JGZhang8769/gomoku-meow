@@ -22,17 +22,21 @@ export interface PlayerInfo {
 }
 
 export interface GameState {
-  board: any[]; // 3D array of piece information
+  board: string; // 3D array of piece information, stringified to avoid nested array errors
   currentTurn: 'black' | 'white';
   round: number;
   status: 'waiting' | 'countdown' | 'playing' | 'ended';
   winner: 'black' | 'white' | null;
   winType: '5-in-a-row' | '4-in-a-row-3d' | 'perfect-win' | null;
+  cameraRotation: number;
   events: {
     blackCooldown: number;
     whiteCooldown: number;
-    activeEvent: 'swipe' | 'box' | 'parkour' | null;
-    eventData?: any;
+    lastEvent: {
+      type: 'swipe' | 'box' | 'parkour';
+      data: any;
+      timestamp: number;
+    } | null;
   };
 }
 
@@ -72,16 +76,17 @@ export class FirebaseService {
 
   getEmptyGameState(): GameState {
     return {
-      board: [], // We'll initialize this as 11x11x9
+      board: '[]', // We'll initialize this as 11x11x9
       currentTurn: 'black',
       round: 1,
       status: 'waiting',
       winner: null,
       winType: null,
+      cameraRotation: 0,
       events: {
         blackCooldown: 0,
         whiteCooldown: 0,
-        activeEvent: null
+        lastEvent: null
       }
     };
   }

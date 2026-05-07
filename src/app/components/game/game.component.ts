@@ -35,6 +35,8 @@ export class GameComponent implements OnInit, OnDestroy {
   isInteractable = true;
   previewPos: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
   private unsubscribe: (() => void) | null = null;
+  private lastProcessedEventTimestamp = 0;
+  private isFirstSync = true;
 
   constructor(
     private route: ActivatedRoute,
@@ -89,8 +91,16 @@ export class GameComponent implements OnInit, OnDestroy {
       }
 
       // Restore state from Firebase
-      if (room.gameState.board && room.gameState.board.length > 0) {
-        this.board = room.gameState.board;
+      if (room.gameState.board && room.gameState.board.length > 0 && room.gameState.board !== '[]') {
+        try {
+          if (typeof room.gameState.board === 'string') {
+            this.board = JSON.parse(room.gameState.board);
+          } else {
+            this.board = room.gameState.board;
+          }
+        } catch (e) {
+          console.error("Failed to parse board from Firebase", e);
+        }
       }
       this.currentTurn = room.gameState.currentTurn;
       this.round = room.gameState.round;
@@ -98,12 +108,17 @@ export class GameComponent implements OnInit, OnDestroy {
       this.winType = room.gameState.winType;
       this.blackCooldown = room.gameState.events.blackCooldown;
       this.whiteCooldown = room.gameState.events.whiteCooldown;
+      this.cameraRotation = room.gameState.cameraRotation || 0;
 
-      if (room.gameState.events.activeEvent) {
-         this.applyEventVisuals({
-            type: room.gameState.events.activeEvent,
-            data: room.gameState.events.eventData
-         });
+      if (room.gameState.events.lastEvent) {
+        const { type, data, timestamp } = room.gameState.events.lastEvent;
+        // Only animate if it's a new event and not the first sync
+        if (timestamp > this.lastProcessedEventTimestamp) {
+          this.lastProcessedEventTimestamp = timestamp;
+          if (!this.isFirstSync) {
+            this.applyEventVisuals({ type, data });
+          }
+        }
       }
 
       const pInfo = room.players[this.firebase.localPlayerId];
@@ -112,6 +127,7 @@ export class GameComponent implements OnInit, OnDestroy {
       }
 
       this.isInteractable = (this.currentTurn === this.localColor) && !this.winner;
+      this.isFirstSync = false;
       this.cdr.detectChanges();
     });
   }
@@ -173,7 +189,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
       if (this.mode === 'multi') {
         await this.firebase.updateGameState(this.roomId!, {
-          board: this.board,
+          board: JSON.stringify(this.board),
           currentTurn: this.currentTurn,
           round: this.round,
           winner: this.winner as any,
@@ -324,23 +340,38 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private async syncState() {
     if (this.mode === 'multi' && this.roomId) {
-      const activeEvent = this.eventAnimationData ? this.eventAnimationData.type : null;
-      const eventData = this.eventAnimationData ? this.eventAnimationData.data : null;
+      let lastEvent = null;
+      if (this.eventAnimationData) {
+        const ts = this.eventAnimationData.timestamp || Date.now();
+        lastEvent = {
+          type: this.eventAnimationData.type,
+          data: this.eventAnimationData.data,
+          timestamp: ts
+        };
+        this.lastProcessedEventTimestamp = ts;
+      }
 
-      await this.firebase.updateGameState(this.roomId, {
-        board: this.board,
+      // We don't overwrite lastEvent with null if there isn't a new one to sync,
+      // but in Firebase, we want to update it when a new event occurs.
+      // So we fetch current state first or just use a specific update payload.
+      const updatePayload: any = {
+        board: JSON.stringify(this.board),
         currentTurn: this.currentTurn,
         round: this.round,
         winner: this.winner as any,
         winType: this.winType as any,
-        events: {
-          blackCooldown: this.blackCooldown,
-          whiteCooldown: this.whiteCooldown,
-          activeEvent: activeEvent,
-          eventData: eventData
-        }
-      });
-      // Clear local event state after syncing so it doesn't loop
+        cameraRotation: this.cameraRotation,
+        'events.blackCooldown': this.blackCooldown,
+        'events.whiteCooldown': this.whiteCooldown,
+      };
+
+      if (lastEvent) {
+        updatePayload['events.lastEvent'] = lastEvent;
+      }
+
+      await this.firebase.updateGameState(this.roomId, updatePayload);
+
+      // Clear local event state after syncing
       this.eventAnimationData = null;
     }
   }
