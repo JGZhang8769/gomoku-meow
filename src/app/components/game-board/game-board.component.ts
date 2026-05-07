@@ -20,6 +20,8 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Input() playerColor: 'black' | 'white' | null = null;
   @Input() previewPosition: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
   @Input() eventAnimationData: any = null;
+  @Input() lastMove: { x: number, y: number, z: number } | null = null;
+  @Input() eventHighlights: { x: number, y: number, z: number }[] | null = null;
   @Output() onCellClick = new EventEmitter<{x: number, z: number}>();
 
   private scene!: THREE.Scene;
@@ -46,12 +48,13 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   ngAfterViewInit() {
     this.initThreeJs();
     this.createBoardBase();
+    this.setInitialCameraAngle();
     this.updatePieces();
     this.animate();
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['boardState']) {
+    if (changes['boardState'] || changes['lastMove'] || changes['eventHighlights']) {
       this.updatePieces();
     }
     if (changes['previewPosition']) {
@@ -165,8 +168,15 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     // Remove old pieces
     for (const mesh of this.pieceMeshes) {
       this.scene.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+      if (mesh.type === 'Group') {
+        mesh.children.forEach(child => {
+          if ((child as any).geometry) (child as any).geometry.dispose();
+          if ((child as any).material) ((child as any).material as THREE.Material).dispose();
+        });
+      } else {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) (mesh.material as THREE.Material).dispose();
+      }
     }
     this.pieceMeshes = [];
 
@@ -231,6 +241,35 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
       mesh.position.set(p.x - offset, p.y * this.CELL_SIZE + (this.CELL_SIZE/2), p.z - offset);
       this.scene.add(mesh);
       this.pieceMeshes.push(mesh);
+    }
+
+    // Draw last move highlight
+    if (this.lastMove) {
+      const { x, y, z } = this.lastMove;
+      const hlGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(this.CELL_SIZE, this.CELL_SIZE, this.CELL_SIZE));
+      const hlMat = new THREE.LineBasicMaterial({ color: 0x00FF00, linewidth: 2 });
+      const hlMesh = new THREE.LineSegments(hlGeo, hlMat);
+      hlMesh.position.set(x - offset, y * this.CELL_SIZE + (this.CELL_SIZE/2), z - offset);
+      this.scene.add(hlMesh);
+      this.pieceMeshes.push(hlMesh as any);
+    }
+
+    // Draw event highlights
+    if (this.eventHighlights && this.eventHighlights.length > 0) {
+      const hlGeo = new THREE.EdgesGeometry(new THREE.BoxGeometry(this.CELL_SIZE, this.CELL_SIZE, this.CELL_SIZE));
+      const hlMat = new THREE.LineBasicMaterial({ color: 0xFF0000, linewidth: 2 });
+      // Also add a subtle transparent red box
+      const boxGeo2 = new THREE.BoxGeometry(this.CELL_SIZE, this.CELL_SIZE, this.CELL_SIZE);
+      const boxMat2 = new THREE.MeshBasicMaterial({ color: 0xFF0000, transparent: true, opacity: 0.2 });
+
+      for (const pos of this.eventHighlights) {
+        const group = new THREE.Group();
+        group.add(new THREE.LineSegments(hlGeo, hlMat));
+        group.add(new THREE.Mesh(boxGeo2, boxMat2));
+        group.position.set(pos.x - offset, pos.y * this.CELL_SIZE + (this.CELL_SIZE/2), pos.z - offset);
+        this.scene.add(group);
+        this.pieceMeshes.push(group as any);
+      }
     }
   }
 

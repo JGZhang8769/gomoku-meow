@@ -31,8 +31,6 @@ export class GameComponent implements OnInit, OnDestroy {
   whiteCooldown = 0;
   activeEventMsg: string | null = null;
   cameraRotation = 0;
-  lastMove: {x: number, y: number, z: number} | null = null;
-  eventHighlights: {x: number, y: number, z: number}[] | null = null;
 
   isInteractable = true;
   previewPos: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
@@ -111,8 +109,6 @@ export class GameComponent implements OnInit, OnDestroy {
       this.blackCooldown = room.gameState.events.blackCooldown;
       this.whiteCooldown = room.gameState.events.whiteCooldown;
       this.cameraRotation = room.gameState.cameraRotation || 0;
-      this.lastMove = room.gameState.lastMove || null;
-      this.eventHighlights = room.gameState.eventHighlights || null;
 
       if (room.gameState.events.lastEvent) {
         const { type, data, timestamp } = room.gameState.events.lastEvent;
@@ -147,8 +143,6 @@ export class GameComponent implements OnInit, OnDestroy {
     this.cameraRotation = 0;
     this.isInteractable = true;
     this.localColor = 'black';
-    this.lastMove = null;
-    this.eventHighlights = null;
 
     if (this.mode === 'multi' && this.roomId) {
       // Reset logic handled by host if needed, simplified here
@@ -175,6 +169,9 @@ export class GameComponent implements OnInit, OnDestroy {
     const { x, z } = this.previewPos;
     this.previewPos = null;
 
+    // 1. Process Turn Start Random Event (From Round 5)
+    await this.checkRandomEvent();
+
     // 2. Place piece
     const placedY = this.engine.placePiece(this.board, x, z, this.currentTurn);
     if (placedY === -1) {
@@ -183,7 +180,6 @@ export class GameComponent implements OnInit, OnDestroy {
     }
 
     this.board = [...this.board];
-    this.lastMove = { x, y: placedY, z };
 
     // 3. Check win
     const winResult = this.engine.checkWin(this.board, x, placedY, z, this.currentTurn);
@@ -198,8 +194,6 @@ export class GameComponent implements OnInit, OnDestroy {
           round: this.round,
           winner: this.winner as any,
           winType: this.winType as any,
-          lastMove: this.lastMove,
-          eventHighlights: this.eventHighlights,
           status: 'ended'
         });
       }
@@ -258,15 +252,6 @@ export class GameComponent implements OnInit, OnDestroy {
   private applyEventVisuals(event: any) {
     if (event.type === 'parkour') {
       this.cameraRotation += event.data.angle;
-      this.eventHighlights = null;
-    } else if (event.type === 'swipe') {
-      if (event.data && event.data.removedPieces) {
-        this.eventHighlights = event.data.removedPieces;
-      }
-    } else if (event.type === 'box') {
-      if (event.data && event.data.dropped) {
-        this.eventHighlights = [{ x: event.data.x, y: event.data.y, z: event.data.z }];
-      }
     }
     // Set animation data to trigger GameBoard component effects
     this.eventAnimationData = { ...event, timestamp: Date.now() };
@@ -296,8 +281,6 @@ export class GameComponent implements OnInit, OnDestroy {
       this.round++; // Round increments after white's turn
     }
 
-    const wasWhite = this.currentTurn === 'white';
-
     this.currentTurn = this.currentTurn === 'black' ? 'white' : 'black';
 
     if (this.mode === 'multi') {
@@ -310,14 +293,6 @@ export class GameComponent implements OnInit, OnDestroy {
       } else {
         this.isInteractable = true;
         this.cdr.detectChanges();
-      }
-    }
-
-    if (wasWhite && !this.winner) {
-      this.eventHighlights = null; // Clear old event highlights at the start of a new round
-      await this.checkRandomEvent();
-      if (this.currentTurn === this.localColor) {
-        this.isInteractable = true;
       }
     }
   }

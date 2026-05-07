@@ -1,0 +1,114 @@
+--- src/app/components/game/game.component.ts
++++ src/app/components/game/game.component.ts
+@@ -29,6 +29,8 @@
+   whiteCooldown = 0;
+   activeEventMsg: string | null = null;
+   cameraRotation = 0;
++  lastMove: {x: number, y: number, z: number} | null = null;
++  eventHighlights: {x: number, y: number, z: number}[] | null = null;
+
+   isInteractable = true;
+   previewPos: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
+@@ -107,6 +109,8 @@
+       this.blackCooldown = room.gameState.events.blackCooldown;
+       this.whiteCooldown = room.gameState.events.whiteCooldown;
+       this.cameraRotation = room.gameState.cameraRotation || 0;
++      this.lastMove = room.gameState.lastMove || null;
++      this.eventHighlights = room.gameState.eventHighlights || null;
+
+       if (room.gameState.events.lastEvent) {
+         const { type, data, timestamp } = room.gameState.events.lastEvent;
+@@ -142,6 +146,8 @@
+     this.cameraRotation = 0;
+     this.isInteractable = true;
+     this.localColor = 'black';
++    this.lastMove = null;
++    this.eventHighlights = null;
+
+     if (this.mode === 'multi' && this.roomId) {
+       // Reset logic handled by host if needed, simplified here
+@@ -165,9 +171,6 @@
+     const { x, z } = this.previewPos;
+     this.previewPos = null;
+
+-    // 1. Process Turn Start Random Event (From Round 5)
+-    await this.checkRandomEvent();
+-
+     // 2. Place piece
+     const placedY = this.engine.placePiece(this.board, x, z, this.currentTurn);
+     if (placedY === -1) {
+@@ -176,6 +179,7 @@
+     }
+
+     this.board = [...this.board];
++    this.lastMove = { x, y: placedY, z };
+
+     // 3. Check win
+     const winResult = this.engine.checkWin(this.board, x, placedY, z, this.currentTurn);
+@@ -189,6 +193,8 @@
+           round: this.round,
+           winner: this.winner as any,
+           winType: this.winType as any,
++          lastMove: this.lastMove,
++          eventHighlights: this.eventHighlights,
+           status: 'ended'
+         });
+       }
+@@ -248,6 +254,15 @@
+   private applyEventVisuals(event: any) {
+     if (event.type === 'parkour') {
+       this.cameraRotation += event.data.angle;
++      this.eventHighlights = null;
++    } else if (event.type === 'swipe') {
++      if (event.data && event.data.removedPieces) {
++        this.eventHighlights = event.data.removedPieces;
++      }
++    } else if (event.type === 'box') {
++      if (event.data && event.data.dropped) {
++        this.eventHighlights = [{ x: event.data.x, y: event.data.y, z: event.data.z }];
++      }
+     }
+     // Set animation data to trigger GameBoard component effects
+     this.eventAnimationData = { ...event, timestamp: Date.now() };
+@@ -275,6 +290,8 @@
+       if (this.whiteCooldown > 0) this.whiteCooldown--;
+       this.round++; // Round increments after white's turn
+     }
++
++    const wasWhite = this.currentTurn === 'white';
+
+     this.currentTurn = this.currentTurn === 'black' ? 'white' : 'black';
+
+@@ -289,11 +306,15 @@
+         this.cdr.detectChanges();
+       }
+     }
++
++    if (wasWhite && !this.winner) {
++      this.eventHighlights = null; // Clear old event highlights at the start of a new round
++      await this.checkRandomEvent();
++    }
+   }
+
+   private async playAITurn() {
+-    await this.checkRandomEvent();
+     if (this.winner) {
+        this.cdr.detectChanges();
+        return;
+@@ -313,6 +334,7 @@
+     if (aiMove.x !== -1) {
+       const placedY = this.engine.placePiece(this.board, aiMove.x, aiMove.z, 'white');
+       this.board = [...this.board];
++      this.lastMove = { x: aiMove.x, y: placedY, z: aiMove.z };
+       this.cdr.detectChanges(); // Force view update to show AI piece
+
+       if (placedY !== -1) {
+@@ -350,6 +372,8 @@
+         winner: this.winner as any,
+         winType: this.winType as any,
+         cameraRotation: this.cameraRotation,
++        lastMove: this.lastMove,
++        eventHighlights: this.eventHighlights,
+         'events.blackCooldown': this.blackCooldown,
+         'events.whiteCooldown': this.whiteCooldown,
+       };

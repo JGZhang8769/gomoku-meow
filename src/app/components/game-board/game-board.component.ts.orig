@@ -46,6 +46,7 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   ngAfterViewInit() {
     this.initThreeJs();
     this.createBoardBase();
+    this.setInitialCameraAngle();
     this.updatePieces();
     this.animate();
   }
@@ -161,11 +162,19 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private updatePieces() {
+    if (!this.scene) return;
     // Remove old pieces
     for (const mesh of this.pieceMeshes) {
       this.scene.remove(mesh);
-      mesh.geometry.dispose();
-      (mesh.material as THREE.Material).dispose();
+      if (mesh.type === 'Group') {
+        mesh.children.forEach(child => {
+          if ((child as any).geometry) (child as any).geometry.dispose();
+          if ((child as any).material) ((child as any).material as THREE.Material).dispose();
+        });
+      } else {
+        if (mesh.geometry) mesh.geometry.dispose();
+        if (mesh.material) (mesh.material as THREE.Material).dispose();
+      }
     }
     this.pieceMeshes = [];
 

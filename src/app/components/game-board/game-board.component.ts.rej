@@ -1,0 +1,10 @@
+--- src/app/components/game-board/game-board.component.ts
++++ src/app/components/game-board/game-board.component.ts
+@@ -46,6 +46,7 @@
+   ngAfterViewInit() {
+     this.initThreeJs();
+     this.createBoardBase();
++    this.setInitialCameraAngle();
+     this.updatePieces();
+     this.animate();
+   }
