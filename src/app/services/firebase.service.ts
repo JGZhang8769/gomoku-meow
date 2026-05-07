@@ -57,11 +57,17 @@ export class FirebaseService {
   constructor() {
     this.app = initializeApp(environment.firebaseConfig);
     this.db = getFirestore(this.app);
-    this.localPlayerId = this.generateId();
+    this.localPlayerId = this.getOrCreatePlayerId();
   }
 
-  private generateId(): string {
-    return Math.random().toString(36).substring(2, 9);
+  private getOrCreatePlayerId(): string {
+    const storedId = localStorage.getItem('gomoku_player_id');
+    if (storedId) {
+      return storedId;
+    }
+    const newId = Math.random().toString(36).substring(2, 9);
+    localStorage.setItem('gomoku_player_id', newId);
+    return newId;
   }
 
   getEmptyGameState(): GameState {
@@ -81,7 +87,7 @@ export class FirebaseService {
   }
 
   async createRoom(roomName: string): Promise<string> {
-    const roomId = this.generateId().toUpperCase();
+    const roomId = Math.random().toString(36).substring(2, 9).toUpperCase();
     const roomRef = doc(this.db, 'rooms', roomId);
 
     const room: Room = {
@@ -102,14 +108,20 @@ export class FirebaseService {
     return roomId;
   }
 
-  async joinRoom(roomId: string): Promise<boolean> {
+  async joinRoom(roomId: string): Promise<{ success: boolean, playing: boolean }> {
     const roomRef = doc(this.db, 'rooms', roomId);
     const roomSnap = await getDoc(roomRef);
 
     if (roomSnap.exists()) {
       const roomData = roomSnap.data() as Room;
-      if (Object.keys(roomData.players).length >= 2 && !roomData.players[this.localPlayerId]) {
-        return false; // Room full
+
+      // If player is already in this room
+      if (roomData.players[this.localPlayerId]) {
+         return { success: true, playing: roomData.gameState.status === 'playing' };
+      }
+
+      if (Object.keys(roomData.players).length >= 2) {
+        return { success: false, playing: false }; // Room full
       }
 
       const updateData = {
@@ -121,9 +133,9 @@ export class FirebaseService {
       };
 
       await updateDoc(roomRef, updateData);
-      return true;
+      return { success: true, playing: roomData.gameState.status === 'playing' };
     }
-    return false;
+    return { success: false, playing: false };
   }
 
   listenToRoom(roomId: string, callback: (room: Room) => void): () => void {
@@ -154,5 +166,16 @@ export class FirebaseService {
   async updateRoom(roomId: string, updateData: any) {
     const roomRef = doc(this.db, 'rooms', roomId);
     await updateDoc(roomRef, updateData);
+  }
+
+  async leaveRoom(roomId: string) {
+    const roomRef = doc(this.db, 'rooms', roomId);
+    const roomSnap = await getDoc(roomRef);
+    if (roomSnap.exists()) {
+      const roomData = roomSnap.data() as Room;
+      const newPlayers = { ...roomData.players };
+      delete newPlayers[this.localPlayerId];
+      await updateDoc(roomRef, { players: newPlayers });
+    }
   }
 }

@@ -173,11 +173,20 @@ export class GameEngineService {
 
   // --- Cat Disruption Events ---
 
-  triggerRandomEvent(board: PieceType[][][], chance: number = 0.05): {type: 'swipe' | 'box' | 'parkour', data: any} | null {
+  triggerRandomEvent(board: PieceType[][][], chance: number = 0.20): {type: 'swipe' | 'box' | 'parkour', data: any} | null {
     if (Math.random() > chance) return null;
 
-    const eventTypes: ('swipe' | 'box' | 'parkour')[] = ['swipe', 'box', 'parkour'];
-    const selectedEvent = eventTypes[Math.floor(Math.random() * eventTypes.length)];
+    const r = Math.random();
+    let selectedEvent: 'swipe' | 'box' | 'parkour';
+
+    // 55% box, 30% swipe, 15% parkour
+    if (r < 0.55) {
+      selectedEvent = 'box';
+    } else if (r < 0.85) {
+      selectedEvent = 'swipe';
+    } else {
+      selectedEvent = 'parkour';
+    }
 
     return this.applyEvent(board, selectedEvent);
   }

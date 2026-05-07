@@ -20,14 +20,14 @@
 
     <!-- Bottom Controls -->
     <div class="bottom-bar">
-      <button
-        class="skill-btn"
-        [disabled]="!canUseSkill()"
-        (click)="useSkill()"
-        [ngClass]="{'ready': canUseSkill()}">
+      <div class="skills-container" *ngIf="getSkillCooldown() === 0">
+        <button class="skill-btn ready" [disabled]="!canUseSkill()" (click)="useSkill('swipe')">🐾 揮打</button>
+        <button class="skill-btn ready" [disabled]="!canUseSkill()" (click)="useSkill('box')">📦 紙箱</button>
+        <button class="skill-btn ready" [disabled]="!canUseSkill()" (click)="useSkill('parkour')">🐈‍⬛ 跑酷</button>
+      </div>
+      <button class="skill-btn" *ngIf="getSkillCooldown() > 0" disabled>
         <span class="icon">🐾</span>
-        <span class="text" *ngIf="getSkillCooldown() === 0">召喚貓咪</span>
-        <span class="text" *ngIf="getSkillCooldown() > 0">冷卻中 ({{getSkillCooldown()}})</span>
+        <span class="text">冷卻中 ({{getSkillCooldown()}})</span>
       </button>
     </div>
 
@@ -46,11 +46,18 @@
     </div>
   </div>
 
+  <!-- Placement Confirmation Overlay -->
+  <div class="confirm-overlay" *ngIf="previewPos && isInteractable">
+    <button class="btn primary huge confirm-btn" (click)="confirmPlacement()">確定放置在此</button>
+  </div>
+
   <!-- 3D Board Canvas -->
   <app-game-board
     [boardState]="board"
     [interactable]="isInteractable && !winner"
     [cameraRotationOffset]="cameraRotation"
+    [playerColor]="localColor"
+    [previewPosition]="previewPos"
     (onCellClick)="onCellClick($event)">
   </app-game-board>
 </div>
