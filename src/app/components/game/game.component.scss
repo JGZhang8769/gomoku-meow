@@ -1,0 +1,136 @@
+.game-container {
+  position: relative;
+  width: 100vw;
+  height: 100vh;
+  overflow: hidden;
+  background-color: #FFF9F5;
+}
+
+.ui-layer {
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  pointer-events: none; /* Let clicks pass through to 3D canvas */
+  z-index: 10;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+}
+
+.top-bar {
+  pointer-events: auto;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 15px 20px;
+  background: linear-gradient(to bottom, rgba(255,249,245,0.9), transparent);
+
+  .btn.small { padding: 8px 15px; font-size: 0.9rem; }
+
+  .status {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: white;
+    padding: 10px 20px;
+    border-radius: 20px;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+
+    .round { font-size: 0.9rem; color: #666; margin-bottom: 5px; }
+    .turn-indicator {
+      font-weight: bold;
+      font-size: 1.2rem;
+      &.black { color: #333; }
+      &.white { color: #888; text-shadow: 1px 1px 0px #EEE; }
+    }
+  }
+}
+
+.event-notification {
+  align-self: center;
+  background: rgba(244, 227, 215, 0.9);
+  color: var(--primary-color);
+  padding: 15px 30px;
+  border-radius: 30px;
+  font-weight: bold;
+  font-size: 1.2rem;
+  box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+  animation: popIn 0.3s ease-out;
+  border: 2px solid var(--secondary-color);
+}
+
+@keyframes popIn {
+  0% { transform: scale(0.5); opacity: 0; }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+.bottom-bar {
+  pointer-events: auto;
+  padding: 20px;
+  display: flex;
+  justify-content: center;
+  background: linear-gradient(to top, rgba(255,249,245,0.9), transparent);
+
+  .skill-btn {
+    background: white;
+    border: 3px solid #DDD;
+    border-radius: 50px;
+    padding: 10px 25px;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    color: #999;
+    cursor: not-allowed;
+    box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+    transition: all 0.3s;
+
+    .icon { font-size: 1.5rem; filter: grayscale(100%); }
+
+    &.ready {
+      border-color: var(--primary-color);
+      color: var(--primary-color);
+      cursor: pointer;
+      .icon { filter: none; }
+      &:active { transform: scale(0.95); }
+    }
+  }
+}
+
+.win-overlay {
+  pointer-events: auto;
+  position: absolute;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(0,0,0,0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(3px);
+
+  .win-card {
+    background: white;
+    padding: 40px;
+    border-radius: 20px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0,0,0,0.2);
+    animation: popIn 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+
+    h2 { color: #666; margin-bottom: 20px; }
+
+    .winner-text {
+      font-size: 3rem;
+      font-weight: bold;
+      margin-bottom: 10px;
+      &.black { color: #333; }
+      &.white { color: #CCC; text-shadow: 1px 1px 2px #999; }
+    }
+
+    .win-type {
+      color: var(--secondary-color);
+      font-size: 1.2rem;
+      font-weight: bold;
+    }
+
+    .mt-4 { margin-top: 30px; }
+  }
+}

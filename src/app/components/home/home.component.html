@@ -1,0 +1,30 @@
+<div class="home-container">
+  <div class="title-section">
+    <h1>🐾 立體貓咪五子棋 🧶</h1>
+    <p>3D 堆疊、隨機搗亂、貓咪最愛紙箱</p>
+  </div>
+
+  <div class="menu-section">
+    <div class="card single-player">
+      <h2>單人模式</h2>
+      <div class="difficulty-selector">
+        <label>
+          <input type="radio" name="difficulty" value="easy" [(ngModel)]="aiDifficulty"> 簡單
+        </label>
+        <label>
+          <input type="radio" name="difficulty" value="normal" [(ngModel)]="aiDifficulty"> 普通
+        </label>
+        <label>
+          <input type="radio" name="difficulty" value="hard" [(ngModel)]="aiDifficulty"> 困難
+        </label>
+      </div>
+      <button class="btn primary" (click)="startSinglePlayer()">開始對戰 AI</button>
+    </div>
+
+    <div class="card multi-player">
+      <h2>雙人連線</h2>
+      <p>建立房間或輸入邀請碼加入朋友的房間</p>
+      <button class="btn secondary" (click)="goToLobby()">前往大廳</button>
+    </div>
+  </div>
+</div>
