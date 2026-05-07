@@ -51,14 +51,11 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   ngOnChanges(changes: SimpleChanges) {
-    if (changes['boardState'] && !changes['boardState'].firstChange) {
+    if (changes['boardState']) {
       this.updatePieces();
     }
     if (changes['previewPosition']) {
       this.updatePieces(); // Re-render pieces to include/exclude preview
-    }
-    if (changes['cameraRotationOffset'] && !changes['cameraRotationOffset'].firstChange) {
-      this.applyCameraRotation();
     }
     if (changes['playerColor'] && changes['playerColor'].currentValue) {
       this.setInitialCameraAngle();
