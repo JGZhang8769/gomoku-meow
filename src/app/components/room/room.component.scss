@@ -1,0 +1,77 @@
+.room-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  min-height: 100vh;
+  padding: 20px;
+  background-color: var(--bg-color);
+}
+
+.header {
+  width: 100%;
+  max-width: 600px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 40px;
+
+  h2 {
+    font-size: 1.2rem;
+    color: var(--text-color);
+  }
+
+  .code {
+    background: white;
+    padding: 5px 10px;
+    border-radius: 8px;
+    cursor: pointer;
+    font-family: monospace;
+    font-weight: bold;
+    color: var(--primary-color);
+  }
+}
+
+.back-btn { background: none; color: var(--secondary-color); border: none; font-weight: bold; }
+
+.players-section {
+  display: flex;
+  gap: 20px;
+  width: 100%;
+  max-width: 600px;
+}
+
+.player-card {
+  flex: 1;
+  background: white;
+  border-radius: 20px;
+  padding: 40px 20px;
+  text-align: center;
+  box-shadow: 0 4px 15px rgba(0,0,0,0.05);
+
+  .avatar { font-size: 3rem; margin-bottom: 15px; }
+  .status { font-weight: bold; color: #999; }
+  .status.ready { color: #4CAF50; }
+
+  &.waiting { opacity: 0.7; border: 2px dashed #CCC; }
+}
+
+.action-section { margin-top: 40px; }
+.btn.huge { font-size: 1.5rem; padding: 15px 40px; border-radius: 30px; }
+.btn.ready-state { background-color: #4CAF50; }
+
+.countdown-overlay {
+  position: fixed;
+  top: 0; left: 0; width: 100%; height: 100%;
+  background: rgba(255, 249, 245, 0.9);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+
+  .countdown-text {
+    text-align: center;
+    font-size: 2rem;
+    color: var(--primary-color);
+    span { font-size: 6rem; font-weight: bold; display: block; margin-top: 20px; }
+  }
+}

@@ -1,0 +1,56 @@
+<div class="game-container">
+  <!-- UI Overlay -->
+  <div class="ui-layer">
+    <div class="top-bar">
+      <button class="btn small" (click)="exitGame()">離開</button>
+      <div class="status">
+        <span class="round">回合: {{round}}</span>
+        <span class="turn-indicator" [ngClass]="currentTurn">
+          {{ currentTurn === 'black' ? '黑貓回合' : '白貓回合' }}
+        </span>
+      </div>
+      <!-- Empty space for flex balance -->
+      <div style="width: 60px"></div>
+    </div>
+
+    <!-- Active Event Notification -->
+    <div class="event-notification" *ngIf="activeEventMsg">
+      {{ activeEventMsg }}
+    </div>
+
+    <!-- Bottom Controls -->
+    <div class="bottom-bar">
+      <button
+        class="skill-btn"
+        [disabled]="!canUseSkill()"
+        (click)="useSkill()"
+        [ngClass]="{'ready': canUseSkill()}">
+        <span class="icon">🐾</span>
+        <span class="text" *ngIf="getSkillCooldown() === 0">召喚貓咪</span>
+        <span class="text" *ngIf="getSkillCooldown() > 0">冷卻中 ({{getSkillCooldown()}})</span>
+      </button>
+    </div>
+
+    <!-- Win Screen Overlay -->
+    <div class="win-overlay" *ngIf="winner">
+      <div class="win-card">
+        <h2>遊戲結束！</h2>
+        <div class="winner-text" [ngClass]="winner">
+          {{ winner === 'black' ? '黑貓' : '白貓' }} 獲勝！
+        </div>
+        <div class="win-type" *ngIf="winType === 'perfect-win'">🌟 完美勝利 🌟</div>
+        <div class="win-type" *ngIf="winType === '5-in-a-row'">平面五子連線</div>
+        <div class="win-type" *ngIf="winType === '4-in-a-row-3d'">立體四子連線</div>
+        <button class="btn primary mt-4" (click)="exitGame()">回首頁</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 3D Board Canvas -->
+  <app-game-board
+    [boardState]="board"
+    [interactable]="isInteractable && !winner"
+    [cameraRotationOffset]="cameraRotation"
+    (onCellClick)="onCellClick($event)">
+  </app-game-board>
+</div>

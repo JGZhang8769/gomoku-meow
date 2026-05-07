@@ -1,0 +1,20 @@
+<div class="lobby-container">
+  <button class="btn back-btn" (click)="goBack()">← 返回首頁</button>
+
+  <div class="card">
+    <h2>建立新房間</h2>
+    <p>建立一個房間並將邀請碼分享給朋友</p>
+    <button class="btn primary" (click)="createRoom()">建立房間</button>
+  </div>
+
+  <div class="divider">或</div>
+
+  <div class="card">
+    <h2>加入房間</h2>
+    <div class="input-group">
+      <input type="text" [(ngModel)]="roomCode" placeholder="輸入邀請碼 (例如: X7Y8Z)" maxlength="8">
+      <button class="btn secondary" (click)="joinRoom()" [disabled]="!roomCode || isJoining">加入</button>
+    </div>
+    <p class="error" *ngIf="errorMsg">{{errorMsg}}</p>
+  </div>
+</div>

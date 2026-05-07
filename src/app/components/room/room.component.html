@@ -1,0 +1,33 @@
+<div class="room-container" *ngIf="room">
+  <div class="header">
+    <button class="btn back-btn" (click)="leaveRoom()">離開房間</button>
+    <h2>房間邀請碼: <span class="code" (click)="copyCode()">{{roomId}} 📋</span></h2>
+  </div>
+
+  <div class="players-section">
+    <div class="player-card" *ngFor="let pId of room.players | keyvalue">
+      <div class="avatar">{{ pId.key === localPlayerId ? '👤 (你)' : '👤' }}</div>
+      <div class="status" [ngClass]="{'ready': pId.value.ready}">
+        {{ pId.value.ready ? '已準備' : '準備中...' }}
+      </div>
+    </div>
+
+    <div class="player-card waiting" *ngIf="(room.players | keyvalue).length < 2">
+      <div class="avatar">⏳</div>
+      <div class="status">等待對手加入...</div>
+    </div>
+  </div>
+
+  <div class="action-section" *ngIf="room.gameState.status === 'waiting'">
+    <button
+      class="btn primary huge"
+      (click)="toggleReady()"
+      [ngClass]="{'ready-state': isReady}">
+      {{ isReady ? '取消準備' : '準備' }}
+    </button>
+  </div>
+
+  <div class="countdown-overlay" *ngIf="room.gameState.status === 'countdown'">
+    <div class="countdown-text">遊戲即將開始...<br><span>{{countdown}}</span></div>
+  </div>
+</div>
