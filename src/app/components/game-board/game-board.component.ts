@@ -17,6 +17,9 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   @Input() boardState: PieceType[][][] = [];
   @Input() interactable: boolean = false;
   @Input() cameraRotationOffset: number = 0; // For Cat Parkour
+  @Input() playerColor: 'black' | 'white' | null = null;
+  @Input() previewPosition: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
+  @Input() eventAnimationData: any = null;
   @Output() onCellClick = new EventEmitter<{x: number, z: number}>();
 
   private scene!: THREE.Scene;
@@ -51,8 +54,17 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     if (changes['boardState'] && !changes['boardState'].firstChange) {
       this.updatePieces();
     }
+    if (changes['previewPosition']) {
+      this.updatePieces(); // Re-render pieces to include/exclude preview
+    }
     if (changes['cameraRotationOffset'] && !changes['cameraRotationOffset'].firstChange) {
       this.applyCameraRotation();
+    }
+    if (changes['playerColor'] && changes['playerColor'].currentValue) {
+      this.setInitialCameraAngle();
+    }
+    if (changes['eventAnimationData'] && changes['eventAnimationData'].currentValue) {
+      this.playEventAnimation(changes['eventAnimationData'].currentValue);
     }
   }
 
@@ -83,6 +95,7 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     this.controls.enableDamping = true;
     this.controls.dampingFactor = 0.05;
     this.controls.maxPolarAngle = Math.PI / 2 - 0.1; // Don't go below board
+    this.controls.enableRotate = false; // Disable manual rotation for fixed camera
 
     // Lighting
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
@@ -132,6 +145,17 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     }
   }
 
+  private setInitialCameraAngle() {
+    // Determine base position based on color
+    if (this.playerColor === 'white') {
+      this.camera.position.set(0, 15, -18);
+    } else {
+      this.camera.position.set(0, 15, 18);
+    }
+    this.camera.lookAt(0, 0, 0);
+    this.controls.update();
+  }
+
   private updatePieces() {
     // Remove old pieces
     for (const mesh of this.pieceMeshes) {
@@ -150,6 +174,9 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
     const blackMat = new THREE.MeshStandardMaterial({ color: this.blackCatColor, roughness: 0.5 });
     const whiteMat = new THREE.MeshStandardMaterial({ color: this.whiteCatColor, roughness: 0.5 });
     const boxMat = new THREE.MeshStandardMaterial({ color: this.boxColor, roughness: 0.9 });
+
+    const blackPreviewMat = new THREE.MeshStandardMaterial({ color: this.blackCatColor, roughness: 0.5, transparent: true, opacity: 0.5 });
+    const whitePreviewMat = new THREE.MeshStandardMaterial({ color: this.whiteCatColor, roughness: 0.5, transparent: true, opacity: 0.5 });
 
     for (let x = 0; x < this.BOARD_SIZE; x++) {
       for (let z = 0; z < this.BOARD_SIZE; z++) {
@@ -182,21 +209,87 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
         }
       }
     }
+
+    if (this.previewPosition) {
+      const p = this.previewPosition;
+      const mesh = new THREE.Mesh(catGeo, p.color === 'black' ? blackPreviewMat : whitePreviewMat);
+      const earGeo = new THREE.ConeGeometry(0.15, 0.3, 8);
+      const earMesh1 = new THREE.Mesh(earGeo, p.color === 'black' ? blackPreviewMat : whitePreviewMat);
+      earMesh1.position.set(-0.2, 0.3, 0);
+      earMesh1.rotation.z = Math.PI / 6;
+      const earMesh2 = new THREE.Mesh(earGeo, p.color === 'black' ? blackPreviewMat : whitePreviewMat);
+      earMesh2.position.set(0.2, 0.3, 0);
+      earMesh2.rotation.z = -Math.PI / 6;
+      mesh.add(earMesh1);
+      mesh.add(earMesh2);
+
+      mesh.position.set(p.x - offset, p.y * this.CELL_SIZE + (this.CELL_SIZE/2), p.z - offset);
+      this.scene.add(mesh);
+      this.pieceMeshes.push(mesh);
+    }
   }
 
   private applyCameraRotation() {
-    // Add offset to current rotation (Cat Parkour)
-    const rad = THREE.MathUtils.degToRad(this.cameraRotationOffset);
+    // We handle rotation smoothly in playEventAnimation now, but keep this for absolute state sync if needed.
+  }
 
-    // We animate this simply by snapping or rotating. For simplicity, let's snap the camera position
-    const radius = Math.sqrt(this.camera.position.x ** 2 + this.camera.position.z ** 2);
-    const currentAngle = Math.atan2(this.camera.position.z, this.camera.position.x);
-    const newAngle = currentAngle + rad;
+  private playEventAnimation(event: any) {
+    if (!event) return;
 
-    this.camera.position.x = radius * Math.cos(newAngle);
-    this.camera.position.z = radius * Math.sin(newAngle);
-    this.camera.lookAt(0, 0, 0);
-    this.controls.update();
+    if (event.type === 'parkour') {
+      const rad = THREE.MathUtils.degToRad(event.data.angle);
+      const radius = Math.sqrt(this.camera.position.x ** 2 + this.camera.position.z ** 2);
+      const targetAngle = Math.atan2(this.camera.position.z, this.camera.position.x) + rad;
+
+      // Smoothly animate camera rotation
+      let frame = 0;
+      const totalFrames = 60; // 1 second at 60fps
+      const startAngle = Math.atan2(this.camera.position.z, this.camera.position.x);
+
+      const animateCamera = () => {
+        frame++;
+        const progress = frame / totalFrames;
+        // Ease in out
+        const ease = progress < .5 ? 2 * progress * progress : -1 + (4 - 2 * progress) * progress;
+        const currentAngle = startAngle + (targetAngle - startAngle) * ease;
+
+        this.camera.position.x = radius * Math.cos(currentAngle);
+        this.camera.position.z = radius * Math.sin(currentAngle);
+        this.camera.lookAt(0, 0, 0);
+        this.controls.update();
+
+        if (frame < totalFrames) {
+          requestAnimationFrame(animateCamera);
+        }
+      };
+      animateCamera();
+    } else if (event.type === 'swipe') {
+      // Create a big temporary cat paw mesh that swipes across
+      const pawGeo = new THREE.CylinderGeometry(1.5, 1.5, 8, 32);
+      const pawMat = new THREE.MeshStandardMaterial({ color: 0x888888 });
+      const paw = new THREE.Mesh(pawGeo, pawMat);
+      paw.rotation.z = Math.PI / 2;
+      paw.position.set(-15, 3, 0);
+      this.scene.add(paw);
+
+      let frame = 0;
+      const totalFrames = 45;
+      const animatePaw = () => {
+        frame++;
+        paw.position.x += 30 / totalFrames; // Sweep across board
+        if (frame < totalFrames) {
+          requestAnimationFrame(animatePaw);
+        } else {
+          this.scene.remove(paw);
+          paw.geometry.dispose();
+          pawMat.dispose();
+        }
+      };
+      animatePaw();
+    } else if (event.type === 'box') {
+      // Just a little bounce effect handled by normal updatePieces dropping in,
+      // but we could add a particle or scale effect here.
+    }
   }
 
   private onPointerDown(event: PointerEvent) {

@@ -33,6 +33,7 @@ export class GameComponent implements OnInit, OnDestroy {
   cameraRotation = 0;
 
   isInteractable = true;
+  previewPos: { x: number, y: number, z: number, color: 'black' | 'white' } | null = null;
   private unsubscribe: (() => void) | null = null;
 
   constructor(
@@ -67,7 +68,26 @@ export class GameComponent implements OnInit, OnDestroy {
   }
 
   private setupMultiplayer() {
-    this.unsubscribe = this.firebase.listenToRoom(this.roomId!, (room: Room) => {
+    this.unsubscribe = this.firebase.listenToRoom(this.roomId!, async (room: Room) => {
+      // Check if we are rejoining an ended game
+      if (room.gameState.status === 'ended') {
+        this.winner = room.gameState.winner as any;
+        this.winType = room.gameState.winType as any;
+      }
+
+      // Handle opponent disconnect
+      if (room.gameState.status === 'playing') {
+        const playerKeys = Object.keys(room.players);
+        if (playerKeys.length < 2 && !this.winner) {
+           this.winner = this.localColor;
+           this.winType = 'perfect-win';
+           this.showEventMessage('對手已離開房間，你獲勝了！');
+           await this.firebase.updateGameState(this.roomId!, { status: 'ended', winner: this.winner as any, winType: this.winType as any });
+           this.cdr.detectChanges();
+           return;
+        }
+      }
+
       // Restore state from Firebase
       if (room.gameState.board && room.gameState.board.length > 0) {
         this.board = room.gameState.board;
@@ -78,6 +98,13 @@ export class GameComponent implements OnInit, OnDestroy {
       this.winType = room.gameState.winType;
       this.blackCooldown = room.gameState.events.blackCooldown;
       this.whiteCooldown = room.gameState.events.whiteCooldown;
+
+      if (room.gameState.events.activeEvent) {
+         this.applyEventVisuals({
+            type: room.gameState.events.activeEvent,
+            data: room.gameState.events.eventData
+         });
+      }
 
       const pInfo = room.players[this.firebase.localPlayerId];
       if (pInfo && pInfo.color) {
@@ -108,27 +135,48 @@ export class GameComponent implements OnInit, OnDestroy {
   async onCellClick(pos: {x: number, z: number}) {
     if (!this.isInteractable || this.winner || this.currentTurn !== this.localColor) return;
 
-    this.isInteractable = false; // Prevent multiple clicks
+    const targetY = this.engine.getTopY(this.board, pos.x, pos.z);
+    if (targetY === -1) return; // Column full
+
+    this.previewPos = { x: pos.x, y: targetY, z: pos.z, color: this.localColor };
+    this.cdr.detectChanges();
+  }
+
+  async confirmPlacement() {
+    if (!this.previewPos) return;
+
+    this.isInteractable = false;
+    const { x, z } = this.previewPos;
+    this.previewPos = null;
 
     // 1. Process Turn Start Random Event (From Round 5)
     await this.checkRandomEvent();
 
     // 2. Place piece
-    const placedY = this.engine.placePiece(this.board, pos.x, pos.z, this.currentTurn);
+    const placedY = this.engine.placePiece(this.board, x, z, this.currentTurn);
     if (placedY === -1) {
       this.isInteractable = true;
-      return; // Column full
+      return; // Shouldn't happen unless event filled it, but safe
     }
 
-    // Clone board to trigger change detection for child component
     this.board = [...this.board];
 
     // 3. Check win
-    const winResult = this.engine.checkWin(this.board, pos.x, placedY, pos.z, this.currentTurn);
+    const winResult = this.engine.checkWin(this.board, x, placedY, z, this.currentTurn);
     if (winResult) {
       this.winner = winResult.winner;
       this.winType = winResult.type;
-      await this.syncState();
+
+      if (this.mode === 'multi') {
+        await this.firebase.updateGameState(this.roomId!, {
+          board: this.board,
+          currentTurn: this.currentTurn,
+          round: this.round,
+          winner: this.winner as any,
+          winType: this.winType as any,
+          status: 'ended'
+        });
+      }
       return;
     }
 
@@ -137,7 +185,7 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private async checkRandomEvent() {
     if (this.round >= 5) {
-      const event = this.engine.triggerRandomEvent(this.board, 0.05); // 5% chance
+      const event = this.engine.triggerRandomEvent(this.board, 0.20); // 20% chance as per new spec
       if (event) {
         this.showEventMessage(`隨機事件觸發！貓咪使出了：${this.getEventName(event.type)}`);
         this.applyEventVisuals(event);
@@ -149,21 +197,19 @@ export class GameComponent implements OnInit, OnDestroy {
     }
   }
 
-  async useSkill() {
+  async useSkill(skillType: 'swipe' | 'box' | 'parkour') {
     if (!this.canUseSkill()) return;
 
     if (this.currentTurn === 'black') this.blackCooldown = 10;
     else this.whiteCooldown = 10;
 
-    // Force trigger an event
-    const event = this.engine.triggerRandomEvent(this.board, 1.0); // 100% chance
-    if (event) {
-      this.showEventMessage(`你使用了技能！貓咪使出了：${this.getEventName(event.type)}`);
-      this.applyEventVisuals(event);
-      this.board = [...this.board];
-      await this.syncState();
-      await new Promise(r => setTimeout(r, 2000));
-    }
+    // Apply specific event chosen by player
+    const event = this.engine.applyEvent(this.board, skillType);
+    this.showEventMessage(`你使用了技能！貓咪使出了：${this.getEventName(event.type)}`);
+    this.applyEventVisuals(event);
+    this.board = [...this.board];
+    await this.syncState();
+    await new Promise(r => setTimeout(r, 2000));
   }
 
   canUseSkill(): boolean {
@@ -180,10 +226,16 @@ export class GameComponent implements OnInit, OnDestroy {
     return this.localColor === 'black' ? this.blackCooldown : this.whiteCooldown;
   }
 
+  // Keep track of latest animation state to pass to GameBoard
+  eventAnimationData: any = null;
+
   private applyEventVisuals(event: any) {
     if (event.type === 'parkour') {
       this.cameraRotation += event.data.angle;
     }
+    // Set animation data to trigger GameBoard component effects
+    this.eventAnimationData = { ...event, timestamp: Date.now() };
+    this.cdr.detectChanges();
   }
 
   private getEventName(type: string): string {
@@ -236,14 +288,15 @@ export class GameComponent implements OnInit, OnDestroy {
 
     if (aiMove.useSkill) {
       this.whiteCooldown = 10;
-      const event = this.engine.triggerRandomEvent(this.board, 1.0);
-      if (event) {
-        this.showEventMessage(`AI 使用了技能！：${this.getEventName(event.type)}`);
-        this.applyEventVisuals(event);
-        this.board = [...this.board];
-        this.cdr.detectChanges();
-        await new Promise(r => setTimeout(r, 2000));
-      }
+      const skills: ('swipe'|'box'|'parkour')[] = ['swipe', 'box', 'parkour'];
+      const chosenSkill = skills[Math.floor(Math.random() * skills.length)];
+      const event = this.engine.applyEvent(this.board, chosenSkill);
+
+      this.showEventMessage(`AI 使用了技能！：${this.getEventName(event.type)}`);
+      this.applyEventVisuals(event);
+      this.board = [...this.board];
+      this.cdr.detectChanges();
+      await new Promise(r => setTimeout(r, 2000));
     }
 
     if (aiMove.x !== -1) {
@@ -267,6 +320,9 @@ export class GameComponent implements OnInit, OnDestroy {
 
   private async syncState() {
     if (this.mode === 'multi' && this.roomId) {
+      const activeEvent = this.eventAnimationData ? this.eventAnimationData.type : null;
+      const eventData = this.eventAnimationData ? this.eventAnimationData.data : null;
+
       await this.firebase.updateGameState(this.roomId, {
         board: this.board,
         currentTurn: this.currentTurn,
@@ -276,13 +332,19 @@ export class GameComponent implements OnInit, OnDestroy {
         events: {
           blackCooldown: this.blackCooldown,
           whiteCooldown: this.whiteCooldown,
-          activeEvent: null
+          activeEvent: activeEvent,
+          eventData: eventData
         }
       });
+      // Clear local event state after syncing so it doesn't loop
+      this.eventAnimationData = null;
     }
   }
 
-  exitGame() {
+  async exitGame() {
+    if (this.mode === 'multi' && this.roomId) {
+       await this.firebase.leaveRoom(this.roomId);
+    }
     this.router.navigate(['/']);
   }
 }

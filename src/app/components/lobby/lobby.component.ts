@@ -34,9 +34,14 @@ export class LobbyComponent {
     const code = this.roomCode.toUpperCase().trim();
 
     try {
-      const success = await this.firebaseService.joinRoom(code);
-      if (success) {
-        this.router.navigate(['/room', code]);
+      const result = await this.firebaseService.joinRoom(code);
+      if (result.success) {
+        if (result.playing) {
+          // Reconnect directly to game
+          this.router.navigate(['/game', 'multi', code]);
+        } else {
+          this.router.navigate(['/room', code]);
+        }
       } else {
         this.errorMsg = '房間不存在或已滿';
       }

@@ -33,59 +33,95 @@ export class AiService {
       return { x: -1, z: -1, useSkill: false };
     }
 
-    if (difficulty === 'easy') {
-      const move = validMoves[Math.floor(Math.random() * validMoves.length)];
-      return { ...move, useSkill };
-    }
-
     const opponentColor: 'black' | 'white' = aiColor === 'black' ? 'white' : 'black';
 
-    // Normal & Hard: Check for immediate win or immediate block
-    // 1. Can I win?
-    for (const move of validMoves) {
-      const y = this.engine.getTopY(board, move.x, move.z);
-      board[move.x][move.z][y] = aiColor;
-      if (this.engine.checkWin(board, move.x, y, move.z, aiColor)) {
-        board[move.x][move.z][y] = null; // Revert
-        return { ...move, useSkill };
-      }
-      board[move.x][move.z][y] = null; // Revert
-    }
-
-    // 2. Do I need to block opponent's immediate win?
-    for (const move of validMoves) {
-      const y = this.engine.getTopY(board, move.x, move.z);
-      board[move.x][move.z][y] = opponentColor;
-      if (this.engine.checkWin(board, move.x, y, move.z, opponentColor)) {
-        board[move.x][move.z][y] = null; // Revert
-        return { ...move, useSkill };
-      }
-      board[move.x][move.z][y] = null; // Revert
-    }
-
-    if (difficulty === 'normal') {
-      // Pick random if no immediate threat or win
-      const move = validMoves[Math.floor(Math.random() * validMoves.length)];
-      return { ...move, useSkill };
-    }
-
-    // Hard: Evaluate moves slightly better (center bias)
-    // Very basic heuristic for Hard AI
     let bestMove = validMoves[0];
-    let minDistance = 999;
-    const centerX = Math.floor(this.engine.BOARD_SIZE / 2);
-    const centerZ = Math.floor(this.engine.BOARD_SIZE / 2);
+    let maxScore = -Infinity;
 
     for (const move of validMoves) {
-       const dist = Math.abs(move.x - centerX) + Math.abs(move.z - centerZ);
-       // Add some randomness to hard AI
-       const score = dist + Math.random() * 2;
-       if (score < minDistance) {
-         minDistance = score;
-         bestMove = move;
-       }
+      const y = this.engine.getTopY(board, move.x, move.z);
+      let score = 0;
+
+      // Easy: Flat only, 80% attack, 20% defense
+      if (difficulty === 'easy') {
+        const attackScore = this.evaluateLines(board, move.x, y, move.z, aiColor, true); // true = flat only
+        const defenseScore = this.evaluateLines(board, move.x, y, move.z, opponentColor, true);
+        score = (attackScore * 0.8) + (defenseScore * 0.2) + Math.random();
+      }
+      // Normal: Flat + 3D, 60% attack, 40% defense
+      else if (difficulty === 'normal') {
+        const attackScore = this.evaluateLines(board, move.x, y, move.z, aiColor, false);
+        const defenseScore = this.evaluateLines(board, move.x, y, move.z, opponentColor, false);
+        score = (attackScore * 0.6) + (defenseScore * 0.4) + Math.random();
+      }
+      // Hard: Flat + 3D, 50% attack, 50% defense + center bias
+      else {
+        const attackScore = this.evaluateLines(board, move.x, y, move.z, aiColor, false);
+        const defenseScore = this.evaluateLines(board, move.x, y, move.z, opponentColor, false);
+
+        // Center bias
+        const centerX = Math.floor(this.engine.BOARD_SIZE / 2);
+        const centerZ = Math.floor(this.engine.BOARD_SIZE / 2);
+        const centerScore = 10 - (Math.abs(move.x - centerX) + Math.abs(move.z - centerZ));
+
+        score = (attackScore * 0.5) + (defenseScore * 0.5) + centerScore + Math.random();
+      }
+
+      // Check immediate win/loss (highest priority for all levels but easy is less smart)
+      if (difficulty !== 'easy') {
+         board[move.x][move.z][y] = aiColor;
+         if (this.engine.checkWin(board, move.x, y, move.z, aiColor)) score += 100000;
+         board[move.x][move.z][y] = opponentColor;
+         if (this.engine.checkWin(board, move.x, y, move.z, opponentColor)) score += 50000;
+         board[move.x][move.z][y] = null;
+      }
+
+      if (score > maxScore) {
+        maxScore = score;
+        bestMove = move;
+      }
     }
 
     return { ...bestMove, useSkill };
+  }
+
+  // Simple heuristic: count consecutive pieces in all directions if we place a piece here
+  private evaluateLines(board: PieceType[][][], x: number, y: number, z: number, color: 'black' | 'white', flatOnly: boolean): number {
+    let score = 0;
+
+    // Flat directions
+    const flatDirs = [ [1,0,0], [0,0,1], [1,0,1], [1,0,-1] ];
+    const threedDirs = [
+      [0,1,0], [1,1,0], [-1,1,0], [0,1,1], [0,1,-1],
+      [1,1,1], [-1,1,1], [1,1,-1], [-1,1,-1]
+    ];
+
+    const dirs = flatOnly ? flatDirs : [...flatDirs, ...threedDirs];
+
+    for (const [dx, dy, dz] of dirs) {
+      let count = 1;
+      // Forward
+      for (let i = 1; i < 5; i++) {
+        const nx = x + dx * i, ny = y + dy * i, nz = z + dz * i;
+        if (nx>=0 && nx<this.engine.BOARD_SIZE && ny>=0 && ny<this.engine.MAX_HEIGHT && nz>=0 && nz<this.engine.BOARD_SIZE) {
+          if (board[nx][nz][ny] === color) count++;
+          else if (board[nx][nz][ny] !== null) break; // blocked
+        } else break;
+      }
+      // Backward
+      for (let i = 1; i < 5; i++) {
+        const nx = x - dx * i, ny = y - dy * i, nz = z - dz * i;
+        if (nx>=0 && nx<this.engine.BOARD_SIZE && ny>=0 && ny<this.engine.MAX_HEIGHT && nz>=0 && nz<this.engine.BOARD_SIZE) {
+          if (board[nx][nz][ny] === color) count++;
+          else if (board[nx][nz][ny] !== null) break; // blocked
+        } else break;
+      }
+
+      if (count === 2) score += 10;
+      if (count === 3) score += 100;
+      if (count === 4) score += 1000;
+    }
+
+    return score;
   }
 }
