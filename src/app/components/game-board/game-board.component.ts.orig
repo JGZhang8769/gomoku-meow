@@ -161,7 +161,6 @@ export class GameBoardComponent implements AfterViewInit, OnDestroy, OnChanges {
   }
 
   private updatePieces() {
-    if (!this.scene) return;
     // Remove old pieces
     for (const mesh of this.pieceMeshes) {
       this.scene.remove(mesh);
