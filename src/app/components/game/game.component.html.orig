@@ -58,8 +58,6 @@
     [cameraRotationOffset]="cameraRotation"
     [playerColor]="localColor"
     [previewPosition]="previewPos"
-    [lastMove]="lastMove"
-    [eventHighlights]="eventHighlights"
     (onCellClick)="onCellClick($event)">
   </app-game-board>
 </div>

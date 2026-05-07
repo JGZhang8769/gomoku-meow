@@ -29,8 +29,6 @@ export interface GameState {
   winner: 'black' | 'white' | null;
   winType: '5-in-a-row' | '4-in-a-row-3d' | 'perfect-win' | null;
   cameraRotation: number;
-  lastMove: { x: number; y: number; z: number } | null;
-  eventHighlights: { x: number; y: number; z: number }[] | null;
   events: {
     blackCooldown: number;
     whiteCooldown: number;
@@ -85,8 +83,6 @@ export class FirebaseService {
       winner: null,
       winType: null,
       cameraRotation: 0,
-      lastMove: null,
-      eventHighlights: null,
       events: {
         blackCooldown: 0,
         whiteCooldown: 0,

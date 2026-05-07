@@ -236,7 +236,7 @@ export class GameEngineService {
     // Apply gravity
     this.applyGravity(board);
 
-    return { removedCount: removeCount, removedPieces };
+    return { removedCount: removeCount };
   }
 
   private applyGravity(board: PieceType[][][]) {
@@ -271,9 +271,8 @@ export class GameEngineService {
     if (availablePositions.length === 0) return { dropped: false };
 
     const randomPos = availablePositions[Math.floor(Math.random() * availablePositions.length)];
-    const placedY = this.placePiece(board, randomPos.x, randomPos.z, 'box');
-
-    return { dropped: true, x: randomPos.x, y: placedY, z: randomPos.z };
+    this.placePiece(board, randomPos.x, randomPos.z, 'box');
+    return { dropped: true, x: randomPos.x, z: randomPos.z };
   }
 
   private applyCatParkour(): any {

@@ -1,0 +1,19 @@
+--- src/app/components/game/game.component.ts
++++ src/app/components/game/game.component.ts
+@@ -325,6 +324,7 @@
+     if (aiMove.x !== -1) {
+       const placedY = this.engine.placePiece(this.board, aiMove.x, aiMove.z, 'white');
+       this.board = [...this.board];
++      this.lastMove = { x: aiMove.x, y: placedY, z: aiMove.z };
+       this.cdr.detectChanges(); // Force view update to show AI piece
+
+       if (placedY !== -1) {
+@@ -351,6 +351,8 @@
+         winner: this.winner as any,
+         winType: this.winType as any,
+         cameraRotation: this.cameraRotation,
++        lastMove: this.lastMove,
++        eventHighlights: this.eventHighlights,
+         'events.blackCooldown': this.blackCooldown,
+         'events.whiteCooldown': this.whiteCooldown,
+       };
