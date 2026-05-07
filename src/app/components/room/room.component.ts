@@ -1,4 +1,4 @@
-import { Component, OnInit, OnDestroy } from '@angular/core';
+import { Component, OnInit, OnDestroy, ChangeDetectorRef } from '@angular/core';
 import { CommonModule } from '@angular/common';
 import { ActivatedRoute, Router } from '@angular/router';
 import { FirebaseService, Room } from '../../services/firebase.service';
@@ -23,7 +23,8 @@ export class RoomComponent implements OnInit, OnDestroy {
   constructor(
     private route: ActivatedRoute,
     private router: Router,
-    private firebaseService: FirebaseService
+    private firebaseService: FirebaseService,
+    private cdr: ChangeDetectorRef
   ) {
     this.localPlayerId = this.firebaseService.localPlayerId;
   }
@@ -45,6 +46,8 @@ export class RoomComponent implements OnInit, OnDestroy {
       } else if (this.room.gameState.status === 'playing') {
         this.router.navigate(['/game', 'multi', this.roomId]);
       }
+
+      this.cdr.detectChanges();
     });
   }
 

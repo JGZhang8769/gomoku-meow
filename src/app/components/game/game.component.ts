@@ -216,16 +216,21 @@ export class GameComponent implements OnInit, OnDestroy {
     } else {
       // Single Player AI Turn
       if (this.currentTurn === 'white' && !this.winner) {
+        this.cdr.detectChanges();
         setTimeout(() => this.playAITurn(), 500);
       } else {
         this.isInteractable = true;
+        this.cdr.detectChanges();
       }
     }
   }
 
   private async playAITurn() {
     await this.checkRandomEvent();
-    if (this.winner) return;
+    if (this.winner) {
+       this.cdr.detectChanges();
+       return;
+    }
 
     const aiMove = this.ai.makeMove(this.board, 'white', this.aiDifficulty, this.round, this.whiteCooldown);
 
@@ -236,6 +241,7 @@ export class GameComponent implements OnInit, OnDestroy {
         this.showEventMessage(`AI 使用了技能！：${this.getEventName(event.type)}`);
         this.applyEventVisuals(event);
         this.board = [...this.board];
+        this.cdr.detectChanges();
         await new Promise(r => setTimeout(r, 2000));
       }
     }
@@ -243,11 +249,14 @@ export class GameComponent implements OnInit, OnDestroy {
     if (aiMove.x !== -1) {
       const placedY = this.engine.placePiece(this.board, aiMove.x, aiMove.z, 'white');
       this.board = [...this.board];
+      this.cdr.detectChanges(); // Force view update to show AI piece
+
       if (placedY !== -1) {
         const winResult = this.engine.checkWin(this.board, aiMove.x, placedY, aiMove.z, 'white');
         if (winResult) {
           this.winner = winResult.winner;
           this.winType = winResult.type;
+          this.cdr.detectChanges();
           return;
         }
       }
